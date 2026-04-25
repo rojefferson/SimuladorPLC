@@ -29,6 +29,94 @@ Grafana
 | node-red-contrib-influxdb | Conector Node-RED para InfluxDB |
 | Grafana | Visualização dos dados históricos |
 
+
+## 1.1. Mapa rápido de IPs, portas e URLs locais
+
+Use estes endereços quando todos os componentes estiverem rodando na mesma máquina Windows.
+
+| Serviço | URL / Host | Porta | Onde usar |
+|---|---|---:|---|
+| Simulador Modbus TCP | `127.0.0.1` | `5020` | Configuração do `modbus-client` no Node-RED |
+| Node-RED | `http://127.0.0.1:1880/` | `1880` | Acesso ao editor visual do Node-RED |
+| Mosquitto MQTT | `127.0.0.1` | `1883` | Broker MQTT nos nodes Sparkplug B |
+| InfluxDB | `http://127.0.0.1:8086/` | `8086` | Node-RED `influxdb batch` e datasource do Grafana |
+| Grafana | `http://127.0.0.1:3000/` | `3000` | Acesso aos dashboards |
+
+Também é possível usar `localhost` no lugar de `127.0.0.1`, por exemplo:
+
+```text
+http://localhost:8086/
+```
+
+Mas, para evitar dúvida, este README usa preferencialmente `127.0.0.1`.
+
+### Testes rápidos de porta
+
+```powershell
+Test-NetConnection 127.0.0.1 -Port 5020  # Simulador Modbus
+Test-NetConnection 127.0.0.1 -Port 1880  # Node-RED
+Test-NetConnection 127.0.0.1 -Port 1883  # Mosquitto
+Test-NetConnection 127.0.0.1 -Port 8086  # InfluxDB
+Test-NetConnection 127.0.0.1 -Port 3000  # Grafana
+```
+
+Resultado esperado:
+
+```text
+TcpTestSucceeded : True
+```
+
+## 1.2. Configurações principais que serão usadas
+
+### Node-RED
+
+```text
+Editor: http://127.0.0.1:1880/
+Pasta do usuário: C:\Users\rojef\.node-red
+```
+
+### Mosquitto
+
+```text
+Broker host: 127.0.0.1
+Broker port: 1883
+Username: vazio para teste local
+Password: vazio para teste local
+TLS: desativado para teste local
+```
+
+### Simulador Modbus
+
+```text
+Host: 127.0.0.1
+Porta: 5020
+Unit ID: 1
+```
+
+### InfluxDB
+
+```text
+URL: http://127.0.0.1:8086/
+Organization: pessoal
+Bucket: simulador_plc
+Token: SEU_TOKEN_INFLUXDB
+Measurement: plc_tags
+```
+
+> Observação: não publique o token real em repositório público. Use `SEU_TOKEN_INFLUXDB` como placeholder em documentação.
+
+### Grafana
+
+```text
+URL: http://127.0.0.1:3000/
+Data source: InfluxDB
+Query language: Flux
+InfluxDB URL: http://127.0.0.1:8086/
+Organization: pessoal
+Default bucket: simulador_plc
+Token: SEU_TOKEN_INFLUXDB
+```
+
 ## 2. Padrão do projeto
 
 ### Modbus Server do simulador
@@ -265,9 +353,53 @@ Senha: admin
 
 O Grafana pedirá para trocar a senha no primeiro acesso.
 
-## 9. Configurar InfluxDB no Grafana
+## 9. Configurar InfluxDB no Grafana — passo a passo completo
 
-No Grafana:
+Antes de configurar o Grafana, confirme que o InfluxDB está aberto em:
+
+```text
+http://127.0.0.1:8086/
+```
+
+E confirme que você tem estes dados:
+
+```text
+Organization: pessoal
+Bucket: simulador_plc
+Token: SEU_TOKEN_INFLUXDB
+```
+
+### 9.1. Gerar ou copiar token no InfluxDB
+
+No InfluxDB:
+
+```text
+http://127.0.0.1:8086/
+→ Load Data
+→ API Tokens
+→ Generate API Token
+→ All Access Token
+```
+
+Copie o token completo.
+
+O token normalmente é uma string longa parecida com:
+
+```text
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
+Use o valor do token, não o nome do token.
+
+### 9.2. Criar Data Source no Grafana
+
+Abra o Grafana:
+
+```text
+http://127.0.0.1:3000/
+```
+
+Depois vá em:
 
 ```text
 Connections
@@ -276,22 +408,42 @@ Connections
 → InfluxDB
 ```
 
-Configure:
+Preencha assim:
 
 ```text
+Name: InfluxDB - Simulador PLC
 Query language: Flux
-URL: http://localhost:8086
+URL: http://127.0.0.1:8086/
 Organization: pessoal
 Default bucket: simulador_plc
-Token: seu_token_do_influxdb
+Token: SEU_TOKEN_INFLUXDB
 ```
 
-Se não aparecer campo Token, use:
+Deixe desativado para ambiente local:
 
 ```text
-Custom HTTP Headers
+Basic auth: OFF
+TLS Client Auth: OFF
+With CA Cert: OFF
+Skip TLS Verify: OFF
+Forward OAuth Identity: OFF
+```
+
+Clique em:
+
+```text
+Save & test
+```
+
+### 9.3. Se o Grafana não mostrar campo Token
+
+Algumas telas do Grafana escondem o token. Nesse caso, use `Custom HTTP Headers`.
+
+Adicione:
+
+```text
 Header: Authorization
-Value: Token SEU_TOKEN_AQUI
+Value: Token SEU_TOKEN_INFLUXDB
 ```
 
 Importante: precisa ter a palavra `Token` antes do token.
@@ -302,10 +454,274 @@ Exemplo:
 Authorization: Token eyJhbGciOiJIUzI1NiIs...
 ```
 
-Clique em:
+### 9.4. Erros comuns na criação do Data Source
+
+#### Erro: unauthorized access
+
+Causa provável:
 
 ```text
-Save & test
+Token errado, token incompleto ou token sem permissão.
+```
+
+Correção:
+
+```text
+InfluxDB → Load Data → API Tokens → Generate API Token → All Access Token
+```
+
+Depois cole o novo token no Grafana.
+
+#### Erro: organization not found
+
+Exemplo:
+
+```text
+organization name "organisation" not found
+```
+
+Correção:
+
+```text
+Organization: pessoal
+```
+
+Use exatamente o nome da organização criada no InfluxDB.
+
+#### Erro: bucket not found
+
+Exemplo:
+
+```text
+bucket "simulador_plc" not found
+```
+
+Correção:
+
+No InfluxDB:
+
+```text
+Load Data → Buckets → Create Bucket
+```
+
+Crie o bucket com nome exato:
+
+```text
+simulador_plc
+```
+
+#### Erro: expected SELECT
+
+Exemplo:
+
+```text
+failed to parse query: found FROM, expected SELECT
+```
+
+Isso significa que o datasource está usando `InfluxQL`, mas a query é `Flux`.
+
+Correção no datasource:
+
+```text
+Query language: Flux
+```
+
+### 9.5. Criar primeiro dashboard no Grafana
+
+No Grafana:
+
+```text
+Dashboards
+→ New
+→ New dashboard
+→ Add visualization
+```
+
+Escolha o data source:
+
+```text
+InfluxDB - Simulador PLC
+```
+
+Use a query base:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+```
+
+Visualização recomendada para teste inicial:
+
+```text
+Table
+```
+
+Se aparecerem dados, o Grafana está lendo o InfluxDB corretamente.
+
+### 9.6. Painel: Temperatura do Motor
+
+Visualização recomendada:
+
+```text
+Time series
+```
+
+Query:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -30m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric == "Process/TemperaturaMotor")
+  |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
+```
+
+Configurações sugeridas:
+
+```text
+Title: Temperatura Motor
+Unit: Celsius / °C
+```
+
+### 9.7. Painel: Nível do Tanque
+
+Visualização recomendada:
+
+```text
+Gauge ou Time series
+```
+
+Query:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -30m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "tanque01")
+  |> filter(fn: (r) => r.metric == "Process/NivelTanque")
+  |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
+```
+
+Configurações sugeridas:
+
+```text
+Title: Nível do Tanque
+Unit: Percent / %
+Min: 0
+Max: 100
+```
+
+### 9.8. Painel: Motor Ligado
+
+Visualização recomendada:
+
+```text
+Stat
+```
+
+Query:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric == "Control/MotorLigado")
+  |> last()
+```
+
+Value mappings:
+
+```text
+0 → Desligado
+1 → Ligado
+```
+
+### 9.9. Painel: Contador de Garrafas
+
+Visualização recomendada:
+
+```text
+Stat
+```
+
+Query:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric == "Production/ContadorGarrafas")
+  |> last()
+```
+
+### 9.10. Painel: Alarmes
+
+Visualização recomendada:
+
+```text
+Stat ou Table
+```
+
+Alarmes da esteira:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric =~ /^Alarm\//)
+  |> last()
+```
+
+Alarmes do tanque:
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "tanque01")
+  |> filter(fn: (r) => r.metric =~ /^Alarm\//)
+  |> last()
+```
+
+Value mappings:
+
+```text
+0 → Normal
+1 → Alarme
+```
+
+### 9.11. Dashboard recomendado
+
+Crie um dashboard chamado:
+
+```text
+Linha de Envase — Simulador PLC
+```
+
+Painéis sugeridos:
+
+```text
+[Stat] Motor Ligado
+[Stat] Contador de Garrafas
+[Gauge] Temperatura Motor
+[Gauge] Nível Tanque
+[Time series] TemperaturaMotor últimos 30 min
+[Time series] NivelTanque últimos 30 min
+[Stat] Alarme Sobrecarga
+[Stat] Alarme Nível Baixo
+[Table] Últimas métricas recebidas
 ```
 
 ## 10. Configurar servidor Modbus no Node-RED
@@ -732,17 +1148,28 @@ msg.payload = [
 return msg;
 ```
 
-## 15. Configurar InfluxDB Batch
+## 15. Configurar InfluxDB Batch no Node-RED
 
-No node `influxdb batch`:
+No node `influxdb batch`, crie uma configuração de servidor InfluxDB com:
 
 ```text
 Version: 2.0
-URL: http://localhost:8086
-Token: seu_token
+URL: http://127.0.0.1:8086/
+Token: SEU_TOKEN_INFLUXDB
 Org: pessoal
 Bucket: simulador_plc
+Time Precision: ms
 ```
+
+O token é o mesmo gerado no InfluxDB em:
+
+```text
+http://127.0.0.1:8086/
+→ Load Data
+→ API Tokens
+```
+
+Para teste local, recomenda-se usar um `All Access Token`. Para produção, use token limitado ao bucket necessário.
 
 ## 16. Consulta Flux no Grafana
 
