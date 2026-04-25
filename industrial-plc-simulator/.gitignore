@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.pylint.d/
+*.json
+!examples/*.json
+!tag_map_example.json
+tag_map.json
+log.txt

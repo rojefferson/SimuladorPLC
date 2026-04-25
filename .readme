@@ -1,0 +1,875 @@
+# README — Instalação Windows: Simulador PLC + Node-RED + Sparkplug B + InfluxDB + Grafana
+
+Este guia instala e configura, em Windows, a arquitetura usada no projeto pessoal de simulação industrial:
+
+```text
+Simulador Python / PyModbus
+        ↓ Modbus TCP
+Node-RED
+        ↓ Sparkplug B / MQTT
+Mosquitto
+        ↓
+Node-RED consumidor Sparkplug B
+        ↓
+InfluxDB
+        ↓
+Grafana
+```
+
+## 1. Componentes usados
+
+| Componente | Função |
+|---|---|
+| Simulador Python | Simula o PLC/equipamento industrial e expõe dados via Modbus TCP |
+| Node-RED | Lê Modbus, converte para Sparkplug B e envia para InfluxDB |
+| node-red-contrib-modbus | Nodes Modbus TCP para Node-RED |
+| node-red-contrib-mqtt-sparkplug-plus | Nodes Sparkplug B para Node-RED |
+| Mosquitto | Broker MQTT local |
+| InfluxDB | Banco de séries temporais |
+| node-red-contrib-influxdb | Conector Node-RED para InfluxDB |
+| Grafana | Visualização dos dados históricos |
+
+## 2. Padrão do projeto
+
+### Modbus Server do simulador
+
+```text
+Host: 127.0.0.1
+Porta: 5020
+Unit ID: 1
+```
+
+### Sparkplug B
+
+```text
+namespace: spBv1.0
+group_id: projeto_pessoal
+edge_node_id: linha_envase_01_node_red
+device_id: esteira01 / tanque01
+```
+
+### InfluxDB
+
+```text
+Organization: pessoal
+Bucket: simulador_plc
+Measurement: plc_tags
+```
+
+## 3. Instalar Node.js
+
+Baixe e instale a versão LTS do Node.js:
+
+```text
+https://nodejs.org/en/download
+```
+
+Depois abra um novo PowerShell e teste:
+
+```powershell
+node --version
+npm --version
+```
+
+## 4. Instalar Node-RED
+
+No PowerShell:
+
+```powershell
+npm install -g node-red
+```
+
+Inicie o Node-RED:
+
+```powershell
+node-red
+```
+
+Abra no navegador:
+
+```text
+http://localhost:1880
+```
+
+Para parar o Node-RED no terminal:
+
+```text
+Ctrl + C
+```
+
+## 5. Instalar nodes necessários no Node-RED
+
+Pare o Node-RED com `Ctrl + C`.
+
+Entre na pasta do Node-RED:
+
+```powershell
+cd C:\Users\rojef\.node-red
+```
+
+Instale os pacotes:
+
+```powershell
+npm install node-red-contrib-modbus
+npm install node-red-contrib-mqtt-sparkplug-plus
+npm install node-red-contrib-influxdb
+npm rebuild
+```
+
+Inicie novamente:
+
+```powershell
+node-red
+```
+
+No Node-RED, procure na paleta por:
+
+```text
+modbus
+sparkplug
+influx
+```
+
+Nodes esperados:
+
+```text
+modbus-read
+modbus-flex-getter
+modbus-write
+
+mqtt sparkplug device
+mqtt sparkplug in
+mqtt sparkplug out
+
+influxdb batch
+influxdb out
+influxdb in
+```
+
+## 6. Instalar Mosquitto MQTT Broker
+
+Baixe o Mosquitto para Windows:
+
+```text
+https://mosquitto.org/download/
+```
+
+Depois de instalar, teste manualmente:
+
+```powershell
+cd "C:\Program Files\mosquitto"
+.\mosquitto.exe -v
+```
+
+Deixe essa janela aberta.
+
+Teste se a porta está ativa:
+
+```powershell
+Test-NetConnection localhost -Port 1883
+```
+
+Resultado esperado:
+
+```text
+TcpTestSucceeded : True
+```
+
+### Teste pub/sub
+
+Terminal 1:
+
+```powershell
+cd "C:\Program Files\mosquitto"
+.\mosquitto_sub.exe -h localhost -p 1883 -t teste/topico
+```
+
+Terminal 2:
+
+```powershell
+cd "C:\Program Files\mosquitto"
+.\mosquitto_pub.exe -h localhost -p 1883 -t teste/topico -m "funcionou"
+```
+
+Se aparecer `funcionou` no terminal do subscriber, o broker está OK.
+
+## 7. Instalar InfluxDB local
+
+Opção via winget:
+
+```powershell
+winget install -e --id InfluxData.InfluxDB.OSS
+```
+
+Se o comando `influxd` não for reconhecido, localize o executável:
+
+```powershell
+Get-ChildItem -Path "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Recurse -Filter influxd.exe -ErrorAction SilentlyContinue
+```
+
+No seu caso, o caminho usado foi parecido com:
+
+```powershell
+cd "C:\Users\rojef\AppData\Local\Microsoft\WinGet\Packages\InfluxData.InfluxDB.OSS_Microsoft.Winget.Source_8wekyb3d8bbwe"
+.\influxd.exe
+```
+
+Deixe a janela aberta.
+
+Abra no navegador:
+
+```text
+http://localhost:8086
+```
+
+Faça o setup inicial:
+
+```text
+Username: admin
+Organization: pessoal
+Bucket: simulador_plc
+```
+
+Guarde o API Token.
+
+Se precisar gerar novo token:
+
+```text
+InfluxDB UI
+→ Load Data
+→ API Tokens
+→ Generate API Token
+→ All Access Token
+```
+
+## 8. Instalar Grafana
+
+Baixe e instale o Grafana para Windows:
+
+```text
+https://grafana.com/grafana/download?platform=windows
+```
+
+Depois abra:
+
+```text
+http://localhost:3000
+```
+
+Login padrão costuma ser:
+
+```text
+Usuário: admin
+Senha: admin
+```
+
+O Grafana pedirá para trocar a senha no primeiro acesso.
+
+## 9. Configurar InfluxDB no Grafana
+
+No Grafana:
+
+```text
+Connections
+→ Data sources
+→ Add data source
+→ InfluxDB
+```
+
+Configure:
+
+```text
+Query language: Flux
+URL: http://localhost:8086
+Organization: pessoal
+Default bucket: simulador_plc
+Token: seu_token_do_influxdb
+```
+
+Se não aparecer campo Token, use:
+
+```text
+Custom HTTP Headers
+Header: Authorization
+Value: Token SEU_TOKEN_AQUI
+```
+
+Importante: precisa ter a palavra `Token` antes do token.
+
+Exemplo:
+
+```text
+Authorization: Token eyJhbGciOiJIUzI1NiIs...
+```
+
+Clique em:
+
+```text
+Save & test
+```
+
+## 10. Configurar servidor Modbus no Node-RED
+
+No Node-RED, crie um `modbus-client` chamado:
+
+```text
+simuladorServer
+```
+
+Configuração:
+
+```text
+Type: TCP
+Host: 127.0.0.1
+Port: 5020
+Unit ID: 1
+```
+
+## 11. Modbus Flex Getter — arquitetura recomendada
+
+O `modbus-flex-getter` não tem Poll Rate próprio. Quem controla a frequência é o `Inject`.
+
+Fluxo:
+
+```text
+Inject a cada 1 segundo
+        ↓
+Function: Gerar Leituras Modbus
+        ↓
+Modbus Flex Getter
+        ↓
+Function: Decodificar Modbus
+        ↓
+Debug / Sparkplug / InfluxDB
+```
+
+### 11.1 Function antes do Modbus Flex Getter
+
+Nome sugerido:
+
+```text
+Gerar Leituras Modbus
+```
+
+Código:
+
+```javascript
+const UNIT_ID = 1;
+const DELAY_MS = 100;
+const originalPayload = msg.payload;
+
+const reads = [
+    { topic: "esteira01/input_register/10", fc: 4, address: 10, quantity: 2 },
+    { topic: "esteira01/holding_register/20", fc: 3, address: 20, quantity: 1 },
+    { topic: "esteira01/coil/1", fc: 1, address: 1, quantity: 1 },
+    { topic: "esteira01/discrete_input/1", fc: 2, address: 1, quantity: 1 },
+    { topic: "esteira01/coil/10", fc: 1, address: 10, quantity: 1 },
+    { topic: "tanque01/input_register/30", fc: 4, address: 30, quantity: 1 },
+    { topic: "tanque01/coil/2", fc: 1, address: 2, quantity: 2 },
+    { topic: "tanque01/coil/11", fc: 1, address: 11, quantity: 2 }
+];
+
+reads.forEach((read, index) => {
+    setTimeout(() => {
+        node.send({
+            topic: read.topic,
+            payload: {
+                value: originalPayload,
+                fc: read.fc,
+                unitid: UNIT_ID,
+                address: read.address,
+                quantity: read.quantity
+            }
+        });
+    }, index * DELAY_MS);
+});
+
+return null;
+```
+
+### 11.2 Function depois do Modbus Flex Getter
+
+Nome sugerido:
+
+```text
+Decodificar Modbus
+```
+
+Código:
+
+```javascript
+const groups = {
+    "esteira01/input_register/10": {
+        equipment: "esteira01",
+        table: "input_register",
+        baseAddress: 10,
+        tags: [
+            { address: 10, tag: "VelocidadeRPM", metric: "Process/VelocidadeRPM", type: "float", scale: 1, unit: "RPM" },
+            { address: 11, tag: "TemperaturaMotor", metric: "Process/TemperaturaMotor", type: "float", scale: 10, unit: "°C" }
+        ]
+    },
+    "esteira01/holding_register/20": {
+        equipment: "esteira01",
+        table: "holding_register",
+        baseAddress: 20,
+        tags: [
+            { address: 20, tag: "ContadorGarrafas", metric: "Production/ContadorGarrafas", type: "int", scale: 1, unit: "un" }
+        ]
+    },
+    "esteira01/coil/1": {
+        equipment: "esteira01",
+        table: "coil",
+        baseAddress: 1,
+        tags: [
+            { address: 1, tag: "MotorLigado", metric: "Control/MotorLigado", type: "boolean", scale: 1, unit: null }
+        ]
+    },
+    "esteira01/discrete_input/1": {
+        equipment: "esteira01",
+        table: "discrete_input",
+        baseAddress: 1,
+        tags: [
+            { address: 1, tag: "SensorPresenca", metric: "Sensor/SensorPresenca", type: "boolean", scale: 1, unit: null }
+        ]
+    },
+    "esteira01/coil/10": {
+        equipment: "esteira01",
+        table: "coil",
+        baseAddress: 10,
+        tags: [
+            { address: 10, tag: "AlarmeSobrecarga", metric: "Alarm/Sobrecarga", type: "boolean", scale: 1, unit: null }
+        ]
+    },
+    "tanque01/input_register/30": {
+        equipment: "tanque01",
+        table: "input_register",
+        baseAddress: 30,
+        tags: [
+            { address: 30, tag: "NivelTanque", metric: "Process/NivelTanque", type: "float", scale: 10, unit: "%" }
+        ]
+    },
+    "tanque01/coil/2": {
+        equipment: "tanque01",
+        table: "coil",
+        baseAddress: 2,
+        tags: [
+            { address: 2, tag: "BombaLigada", metric: "Control/BombaLigada", type: "boolean", scale: 1, unit: null },
+            { address: 3, tag: "ValvulaEntrada", metric: "Control/ValvulaEntrada", type: "boolean", scale: 1, unit: null }
+        ]
+    },
+    "tanque01/coil/11": {
+        equipment: "tanque01",
+        table: "coil",
+        baseAddress: 11,
+        tags: [
+            { address: 11, tag: "AlarmeNivelBaixo", metric: "Alarm/NivelBaixo", type: "boolean", scale: 1, unit: null },
+            { address: 12, tag: "AlarmeNivelAlto", metric: "Alarm/NivelAlto", type: "boolean", scale: 1, unit: null }
+        ]
+    }
+};
+
+const group = groups[msg.topic];
+
+if (!group) {
+    node.warn("Grupo Modbus não mapeado: " + msg.topic);
+    return null;
+}
+
+function extractValues(msg) {
+    const payload = msg.payload;
+
+    if (Array.isArray(payload)) return payload;
+    if (payload && Array.isArray(payload.data)) return payload.data;
+    if (payload && Array.isArray(payload.buffer)) return payload.buffer;
+    if (payload && payload.responseBuffer && Array.isArray(payload.responseBuffer.buffer)) return payload.responseBuffer.buffer;
+    if (payload && payload.responseBuffer && Array.isArray(payload.responseBuffer.valuesAsArray)) return payload.responseBuffer.valuesAsArray;
+    if (msg.responseBuffer && Array.isArray(msg.responseBuffer.buffer)) return msg.responseBuffer.buffer;
+    if (msg.responseBuffer && Array.isArray(msg.responseBuffer.valuesAsArray)) return msg.responseBuffer.valuesAsArray;
+    if (msg.modbusResponse && Array.isArray(msg.modbusResponse.data)) return msg.modbusResponse.data;
+
+    return [payload];
+}
+
+function convertValue(raw, type, scale) {
+    if (type === "boolean") return Boolean(raw);
+    if (type === "int") return parseInt(raw, 10);
+    if (type === "float") return Number(raw) / scale;
+    return raw;
+}
+
+const values = extractValues(msg);
+const output = [];
+
+for (const tag of group.tags) {
+    const index = tag.address - group.baseAddress;
+    const raw = values[index];
+
+    if (raw === undefined) {
+        node.warn(`Sem valor para ${group.equipment}/${tag.tag} no índice ${index}`);
+        continue;
+    }
+
+    output.push({
+        topic: `${group.equipment}/${tag.tag}`,
+        payload: {
+            equipment: group.equipment,
+            tag: tag.tag,
+            metric: tag.metric,
+            table: group.table,
+            address: tag.address,
+            raw_value: raw,
+            value: convertValue(raw, tag.type, tag.scale),
+            type: tag.type,
+            unit: tag.unit,
+            timestamp: new Date().toISOString()
+        }
+    });
+}
+
+return [output];
+```
+
+## 12. Converter Tag Normalizada para Sparkplug B
+
+Depois da Function `Decodificar Modbus`, coloque:
+
+```text
+Function: Tag → Sparkplug B
+```
+
+Código:
+
+```javascript
+const data = msg.payload || {};
+
+const equipment = data.equipment || "unknown_device";
+const metricName = data.metric || data.tag || msg.topic || "unknown_metric";
+
+let value = data.value;
+
+if (data.type === "boolean") value = Boolean(value);
+else if (data.type === "int") value = parseInt(value, 10);
+else if (data.type === "float") value = Number(value);
+
+if (value === undefined || value === null || Number.isNaN(value)) {
+    node.warn("Valor inválido para Sparkplug: " + JSON.stringify(data));
+    return null;
+}
+
+msg.device = equipment;
+msg.topic = `${equipment}/${metricName}`;
+
+msg.payload = {
+    metrics: [
+        {
+            name: metricName,
+            value: value,
+            timestamp: new Date()
+        }
+    ]
+};
+
+return msg;
+```
+
+Depois coloque um `switch`:
+
+```text
+msg.device == esteira01 → mqtt sparkplug device esteira01
+msg.device == tanque01  → mqtt sparkplug device tanque01
+```
+
+## 13. Configurar Sparkplug Devices
+
+### Esteira
+
+```text
+Node: mqtt sparkplug device
+
+Group ID: projeto_pessoal
+Edge Node ID: linha_envase_01_node_red
+Device ID: esteira01
+Broker: localhost:1883
+```
+
+### Tanque
+
+```text
+Node: mqtt sparkplug device
+
+Group ID: projeto_pessoal
+Edge Node ID: linha_envase_01_node_red
+Device ID: tanque01
+Broker: localhost:1883
+```
+
+## 14. Consumir Sparkplug B no Node-RED
+
+Fluxo:
+
+```text
+mqtt sparkplug in
+        ↓
+Function: Consumidor Sparkplug
+        ↓
+Function: Preparar InfluxDB
+        ↓
+influxdb batch
+```
+
+### Function: Consumidor Sparkplug
+
+```javascript
+let topicParts = (msg.topic || "").split("/");
+
+let namespace = topicParts[0] || "";
+let groupId = topicParts[1] || "";
+let messageType = topicParts[2] || "";
+let edgeNodeId = topicParts[3] || "";
+let deviceId = topicParts[4] || "node";
+
+let metrics = [];
+
+if (msg.payload && Array.isArray(msg.payload.metrics)) {
+    metrics = msg.payload.metrics;
+} else if (Array.isArray(msg.metrics)) {
+    metrics = msg.metrics;
+} else {
+    node.warn("Mensagem Sparkplug sem metrics: " + JSON.stringify(msg.payload));
+    return null;
+}
+
+if (metrics.length === 0) {
+    return null;
+}
+
+let messages = [];
+
+for (let metric of metrics) {
+    let metricName = metric.name || metric.alias || "unknown_metric";
+
+    let value = metric.value;
+
+    if (value === undefined && metric.int_value !== undefined) value = metric.int_value;
+    if (value === undefined && metric.float_value !== undefined) value = metric.float_value;
+    if (value === undefined && metric.double_value !== undefined) value = metric.double_value;
+    if (value === undefined && metric.boolean_value !== undefined) value = metric.boolean_value;
+    if (value === undefined && metric.string_value !== undefined) value = metric.string_value;
+
+    let timestamp = metric.timestamp || msg.payload.timestamp || Date.now();
+
+    messages.push({
+        topic: `${deviceId}/${metricName}`,
+        payload: value,
+        sparkplug: {
+            namespace: namespace,
+            group_id: groupId,
+            message_type: messageType,
+            edge_node_id: edgeNodeId,
+            device_id: deviceId,
+            metric_name: metricName,
+            timestamp: timestamp
+        },
+        original_metric: metric
+    });
+}
+
+return [messages];
+```
+
+### Function: Preparar InfluxDB
+
+```javascript
+const sparkplug = msg.sparkplug || {};
+
+const project = "projeto_pessoal";
+const source = "sparkplug_b";
+
+let value = msg.payload;
+
+if (typeof value === "boolean") value = value ? 1 : 0;
+
+if (typeof value === "string" && value.trim() !== "" && !isNaN(Number(value))) {
+    value = Number(value);
+}
+
+if (typeof value !== "number" || Number.isNaN(value)) {
+    node.warn("Valor ignorado porque não é numérico: " + JSON.stringify(msg.payload));
+    return null;
+}
+
+const deviceId = sparkplug.device_id || "unknown_device";
+const metricName = sparkplug.metric_name || msg.topic || "unknown_metric";
+const category = metricName.split("/")[0] || "unknown_category";
+
+let timestamp = sparkplug.timestamp || Date.now();
+
+if (typeof timestamp === "number" && timestamp < 10000000000) {
+    timestamp = timestamp * 1000;
+}
+
+msg.payload = [
+    {
+        measurement: "plc_tags",
+        fields: {
+            value: value
+        },
+        tags: {
+            project: project,
+            source: source,
+            namespace: sparkplug.namespace || "spBv1.0",
+            group_id: sparkplug.group_id || "projeto_pessoal",
+            message_type: sparkplug.message_type || "unknown",
+            edge_node_id: sparkplug.edge_node_id || "linha_envase_01_node_red",
+            device: deviceId,
+            metric: metricName,
+            category: category
+        },
+        timestamp: new Date(timestamp)
+    }
+];
+
+return msg;
+```
+
+## 15. Configurar InfluxDB Batch
+
+No node `influxdb batch`:
+
+```text
+Version: 2.0
+URL: http://localhost:8086
+Token: seu_token
+Org: pessoal
+Bucket: simulador_plc
+```
+
+## 16. Consulta Flux no Grafana
+
+### Todas as métricas
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+```
+
+### TemperaturaMotor
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -30m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric == "Process/TemperaturaMotor")
+  |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
+```
+
+### NivelTanque
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -30m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "tanque01")
+  |> filter(fn: (r) => r.metric == "Process/NivelTanque")
+  |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
+```
+
+### Último valor do motor
+
+```flux
+from(bucket: "simulador_plc")
+  |> range(start: -15m)
+  |> filter(fn: (r) => r._measurement == "plc_tags")
+  |> filter(fn: (r) => r._field == "value")
+  |> filter(fn: (r) => r.device == "esteira01")
+  |> filter(fn: (r) => r.metric == "Control/MotorLigado")
+  |> last()
+```
+
+## 17. Erros comuns
+
+### `organization name "organisation" not found`
+
+No Node-RED ou Grafana, troque:
+
+```text
+Org: organisation
+```
+
+por:
+
+```text
+Org: pessoal
+```
+
+### `bucket "bucket" not found`
+
+Troque:
+
+```text
+Bucket: bucket
+```
+
+por:
+
+```text
+Bucket: simulador_plc
+```
+
+### `unauthorized access`
+
+Gere um novo token no InfluxDB:
+
+```text
+Load Data → API Tokens → Generate API Token → All Access Token
+```
+
+Use esse token no Node-RED e Grafana.
+
+### Query Flux dando erro `expected SELECT`
+
+O datasource do Grafana está configurado como InfluxQL. Troque para:
+
+```text
+Query language: Flux
+```
+
+### `modbus-flex-getter` aparece só `connected`
+
+Isso é normal. O `modbus-flex-getter` não tem Poll Rate próprio. Quem controla a frequência é o `Inject`.
+
+### Valores numéricos zerados
+
+Valide primeiro no Modbus:
+
+```text
+TemperaturaMotor:
+FC4
+Address 11
+Quantity 1
+
+NivelTanque:
+FC4
+Address 30
+Quantity 1
+```
+
+Se ambos vierem zero, o problema provavelmente está no simulador não escrevendo os `input_registers`.
+
+## 18. Ordem recomendada de validação
+
+1. Iniciar simulador Python.
+2. Confirmar Modbus em `127.0.0.1:5020`.
+3. Iniciar Mosquitto.
+4. Iniciar Node-RED.
+5. Testar `modbus-flex-getter` com um endereço simples.
+6. Decodificar Modbus para tag normalizada.
+7. Publicar Sparkplug B.
+8. Consumir Sparkplug B no Node-RED.
+9. Gravar InfluxDB.
+10. Visualizar no Grafana.

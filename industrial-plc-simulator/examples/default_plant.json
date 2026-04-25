@@ -1,0 +1,137 @@
+{
+  "simulation_name": "Linha de Envase Padrão",
+  "version": "1.0",
+  "modbus_server": {
+    "host": "127.0.0.1",
+    "port": 5020,
+    "unit_id": 1
+  },
+  "plant": {
+    "name": "Linha de Envase Padrão",
+    "areas": [
+      {
+        "name": "producao",
+        "lines": [
+          {
+            "name": "linha_envase_01",
+            "equipments": [
+              {
+                "name": "esteira01",
+                "description": "Esteira principal da linha de envase",
+                "tags": [
+                  {
+                    "name": "MotorLigado",
+                    "tag_type": "digital_output",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 1, "scale": 1.0 },
+                    "simulation": { "mode": "state", "initial_value": true }
+                  },
+                  {
+                    "name": "VelocidadeRPM",
+                    "tag_type": "analog_input",
+                    "data_type": "float",
+                    "unit": "RPM",
+                    "modbus": { "table": "input_register", "address": 10, "scale": 1.0 },
+                    "simulation": { "mode": "rule", "min": 0, "max": 2000, "initial_value": 0 }
+                  },
+                  {
+                    "name": "TemperaturaMotor",
+                    "tag_type": "analog_input",
+                    "data_type": "float",
+                    "unit": "°C",
+                    "modbus": { "table": "input_register", "address": 11, "scale": 10.0 },
+                    "simulation": { "mode": "random_walk", "min": 20, "max": 100, "initial_value": 25 }
+                  },
+                  {
+                    "name": "ContadorGarrafas",
+                    "tag_type": "counter",
+                    "data_type": "int",
+                    "modbus": { "table": "holding_register", "address": 20, "scale": 1.0 },
+                    "simulation": { "mode": "counter", "min": 0, "max": 100000, "initial_value": 0 }
+                  },
+                  {
+                    "name": "SensorPresenca",
+                    "tag_type": "digital_input",
+                    "data_type": "bool",
+                    "modbus": { "table": "discrete_input", "address": 1, "scale": 1.0 },
+                    "simulation": { "mode": "rule", "initial_value": false }
+                  },
+                  {
+                    "name": "AlarmeSobrecarga",
+                    "tag_type": "alarm",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 10, "scale": 1.0 },
+                    "simulation": { "mode": "rule", "initial_value": false }
+                  },
+                  {
+                    "name": "Start",
+                    "tag_type": "command",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 100, "scale": 1.0 },
+                    "simulation": { "mode": "command", "initial_value": false }
+                  },
+                  {
+                    "name": "Stop",
+                    "tag_type": "command",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 101, "scale": 1.0 },
+                    "simulation": { "mode": "command", "initial_value": false }
+                  },
+                  {
+                    "name": "Reset",
+                    "tag_type": "command",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 102, "scale": 1.0 },
+                    "simulation": { "mode": "command", "initial_value": false }
+                  }
+                ]
+              },
+              {
+                "name": "tanque01",
+                "description": "Tanque de armazenamento",
+                "tags": [
+                  {
+                    "name": "NivelTanque",
+                    "tag_type": "analog_input",
+                    "data_type": "float",
+                    "unit": "%",
+                    "modbus": { "table": "input_register", "address": 30, "scale": 10.0 },
+                    "simulation": { "mode": "random_walk", "min": 0, "max": 100, "initial_value": 50 }
+                  },
+                  {
+                    "name": "BombaLigada",
+                    "tag_type": "digital_output",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 2, "scale": 1.0 },
+                    "simulation": { "mode": "state", "initial_value": true }
+                  },
+                  {
+                    "name": "ValvulaEntrada",
+                    "tag_type": "digital_output",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 3, "scale": 1.0 },
+                    "simulation": { "mode": "state", "initial_value": false }
+                  },
+                  {
+                    "name": "AlarmeNivelBaixo",
+                    "tag_type": "alarm",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 11, "scale": 1.0 },
+                    "simulation": { "mode": "rule", "initial_value": false }
+                  },
+                  {
+                    "name": "AlarmeNivelAlto",
+                    "tag_type": "alarm",
+                    "data_type": "bool",
+                    "modbus": { "table": "coil", "address": 12, "scale": 1.0 },
+                    "simulation": { "mode": "rule", "initial_value": false }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
